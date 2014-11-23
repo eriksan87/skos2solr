@@ -12,9 +12,11 @@ import org.apache.solr.client.solrj.SolrServer;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.impl.HttpSolrServer;
 import org.apache.solr.common.SolrInputDocument;
+
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
+
 import javax.xml.parsers.ParserConfigurationException;
 
 
@@ -38,7 +40,7 @@ public class SkosThes2SolrIndex {
 			}
             df = man.getSKOSDataFactory();
             try {
-				dataSet = man.loadDataset(URI.create("file:/Users/Windows/Desktop/docCorpus/thes/EuroVocSKOS.rdf"));
+				dataSet = man.loadDataset(URI.create("file:/Users/Public/EuroVocSKOS.rdf"));
 			} catch (SKOSCreationException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
@@ -50,25 +52,23 @@ public class SkosThes2SolrIndex {
                 SolrInputDocument doc = new SolrInputDocument();
                 
 //*************************************************************************************************************************
-            	
-            	for (SKOSAnnotation anno : concepts.getSKOSAnnotations(dataSet)) {
-            		String ID=null;
-                	String annotazione_corrente=null;
-                	if (anno.isAnnotationByConstant()) { // prendo il literal dell'annotazione corrente
-                    	annotazione_corrente= anno.getAnnotationValueAsConstant().getAsSKOSUntypedLiteral().getLiteral();
-                     }
-                	else
-                	{
-                		annotazione_corrente=anno.getAnnotationValue().getURI().toString();
-                	}
-                	
-            	if(anno.getURI().getFragment().toString().compareTo("prefLabel")==0) //se l'annotazione corrente è una preflabel allora lo metto nell'id
-                {
-                	ID=annotazione_corrente;
-                	System.out.println("ID="+ID);
-                	doc.addField("concept",ID);
+            	// Pref Label
+                for (SKOSAnnotation con : concepts.getSKOSAnnotationsByURI(dataSet, df.getSKOSPrefLabelProperty().getURI())) {
+                    String prefLabel=null;
+                	if (con.getAnnotationValueAsConstant() instanceof SKOSUntypedLiteral) {
+                        SKOSUntypedLiteral unCon = con.getAnnotationValueAsConstant().getAsSKOSUntypedLiteral();
+                        System.out.println("\t\tPrefLabel: " + unCon.getLiteral() + " lang: " + unCon.getLang());
+                        prefLabel=unCon.getLiteral();
+                    }
+                    else if (con.getAnnotationValueAsConstant() instanceof SKOSTypedLiteral) {
+                        SKOSTypedLiteral unCon = con.getAnnotationValueAsConstant().getAsSKOSTypedLiteral();
+                        System.out.println("\t\tPrefLabel: " + unCon.getLiteral());
+                        prefLabel=unCon.getLiteral();
+                    }
+
+                	doc.addField("concept",prefLabel);
                 	try {
-						Stemmer a=new Stemmer(ID);
+						Stemmer a=new Stemmer(prefLabel);
 						doc.addField("descrittore",a.getIndexS());
 					} catch (IOException e) {
 						// TODO Auto-generated catch block
@@ -80,68 +80,71 @@ public class SkosThes2SolrIndex {
 						// TODO Auto-generated catch block
 						e.printStackTrace();
 					}
-                	       
+                   
                 }
-            	
-            	if(anno.getURI().getFragment().toString().compareTo("altLabel")==0) //se l'annotazione corrente è un' Altlabel allora lo metto nell'id
-                {
-                	System.out.println("altLabel="+annotazione_corrente);
-                	doc.addField("altlabel", annotazione_corrente);
-                 
-                }
-            
-            	
-            	if(anno.getURI().getFragment().toString().compareTo("inScheme")==0) //recupero il microthesauro
-                {
-            		for (SKOSLiteral MT :df.getSKOSConcept(URI.create(annotazione_corrente)).getSKOSRelatedConstantByProperty(dataSet, df.getSKOSPrefLabelProperty())) 
-            		{
-                        System.out.println(" Microthes: " + MT.getLiteral());
-                        doc.addField("mt", MT.getLiteral());
-                        MicTh=MT.getLiteral();
-                        
-                        
+
+                // Alt Label
+                for (SKOSAnnotation con : concepts.getSKOSAnnotationsByURI(dataSet, df.getSKOSAltLabelProperty().getURI())) {
+                    if (con.getAnnotationValueAsConstant() instanceof SKOSUntypedLiteral) {
+                        SKOSUntypedLiteral unCon = con.getAnnotationValueAsConstant().getAsSKOSUntypedLiteral();
+                        System.out.println("\t\tAltLabel: " + unCon.getLiteral() + " lang: " + unCon.getLang());
+                        doc.addField("altlabel", unCon.getLiteral());
                     }
-            		
-                }
-            	
-            	if(anno.getURI().getFragment().toString().compareTo("related")==0) //recupero i related
-                {
-            		for (SKOSLiteral RL :df.getSKOSConcept(URI.create(annotazione_corrente)).getSKOSRelatedConstantByProperty(dataSet, df.getSKOSPrefLabelProperty())) 
-            		{
-                        System.out.println("Related: " + RL.getLiteral());
-                        doc.addField("related", RL.getLiteral());
+                    else if (con.getAnnotationValueAsConstant() instanceof SKOSTypedLiteral) {
+                        SKOSTypedLiteral unCon = con.getAnnotationValueAsConstant().getAsSKOSTypedLiteral();
+                        System.out.println("\t\tAltLabel: " + unCon.getLiteral());
+                        doc.addField("altlabel", unCon.getLiteral());
                     }
-            		
+                }	       
+
+                
+                // Scope Note
+                for (SKOSAnnotation con : concepts.getSKOSAnnotationsByURI(dataSet, df.getSKOSScopeNoteDataProperty().getURI())) {
+                    if (con.getAnnotationValueAsConstant() instanceof SKOSUntypedLiteral) {
+                        SKOSUntypedLiteral unCon = con.getAnnotationValueAsConstant().getAsSKOSUntypedLiteral();
+                        System.out.println("\t\tScopeNote: " + unCon.getLiteral() + " lang: " + unCon.getLang());
+                        doc.addField("note", unCon.getLiteral());
+                    }
+                    else if (con.getAnnotationValueAsConstant() instanceof SKOSTypedLiteral) {
+                        SKOSTypedLiteral unCon = con.getAnnotationValueAsConstant().getAsSKOSTypedLiteral();
+                        System.out.println("\t\tScopeNote: " + unCon.getLiteral());
+                        doc.addField("note", unCon.getLiteral());
+                    }
                 }
-            	
-            	if(anno.getURI().getFragment().toString().compareTo("narrower")==0) //recupero i narrower
-                {
-            		for (SKOSLiteral NR :df.getSKOSConcept(URI.create(annotazione_corrente)).getSKOSRelatedConstantByProperty(dataSet, df.getSKOSPrefLabelProperty())) 
+                
+                
+                // Broader
+                for (SKOSEntity c : concepts.getSKOSRelatedEntitiesByProperty(dataSet, df.getSKOSBroaderProperty())) {
+                    System.out.println("\t\thasBroader: " + c.getURI());
+                    for (SKOSLiteral BR :df.getSKOSConcept(c.getURI()).getSKOSRelatedConstantByProperty(dataSet, df.getSKOSPrefLabelProperty())) 
+            		{
+                        System.out.println("Broader: " + BR.getLiteral());
+                        doc.addField("broader", BR.getLiteral());
+                    }
+                }
+                
+                // Narrower
+                for (SKOSEntity c : concepts.getSKOSRelatedEntitiesByProperty(dataSet, df.getSKOSNarrowerProperty())) {
+                    System.out.println("\t\thasNarrower: " + c.getURI());
+                    for (SKOSLiteral NR :df.getSKOSConcept(c.getURI()).getSKOSRelatedConstantByProperty(dataSet, df.getSKOSPrefLabelProperty())) 
             		{
                         System.out.println("Narrower: " + NR.getLiteral());
                         doc.addField("narrower", NR.getLiteral());
                     }
-            		
                 }
-            	
-            	if(anno.getURI().getFragment().toString().compareTo("broader")==0) //recupero i broader
-                {
-            		for (SKOSLiteral BR :df.getSKOSConcept(URI.create(annotazione_corrente)).getSKOSRelatedConstantByProperty(dataSet, df.getSKOSPrefLabelProperty())) 
+                
+                
+                //related
+                for (SKOSEntity c : concepts.getSKOSRelatedEntitiesByProperty(dataSet, df.getSKOSRelatedProperty())) {
+                    System.out.println("\t\thasRelated: " + c.getURI());
+                    for (SKOSLiteral RL :df.getSKOSConcept(c.getURI()).getSKOSRelatedConstantByProperty(dataSet, df.getSKOSPrefLabelProperty())) 
             		{
-            			
-                        System.out.println("Broader: " + BR.getLiteral());
-                        doc.addField("broader", BR.getLiteral());
-                        
+                        System.out.println("Related: " + RL.getLiteral());
+                        doc.addField("related", RL.getLiteral());
                     }
-            		
                 }
-            	
-            	if(anno.getURI().getFragment().toString().compareTo("scopeNote")==0) //recupero gli scopeNote
-                {
-                        System.out.println(" ScopeNote: " + annotazione_corrente);
-                        doc.addField("note", annotazione_corrente);
-                }
-            }
+
+ 
             	//*********************************
                  
                 ArrayList<String> broaders = new ArrayList<String>();
@@ -195,35 +198,45 @@ public class SkosThes2SolrIndex {
     
 
 
-    public ArrayList<String> getBroader(SKOSConcept c)
+    public ArrayList<String> getBroader(SKOSConcept concept)
     {
     	String prefLabel=null;
-    	for(SKOSAnnotation annotation : c.getSKOSAnnotations(dataSet))
-    	{
-    		if(annotation.getURI().getFragment().toString().compareTo("prefLabel")==0) 
-    		{
-    			prefLabel = annotation.getAnnotationValueAsConstant().getAsSKOSUntypedLiteral().getLiteral(); 
-    		}
+
+    	for (SKOSAnnotation con : concept.getSKOSAnnotationsByURI(dataSet, df.getSKOSPrefLabelProperty().getURI())) {
+        	if (con.getAnnotationValueAsConstant() instanceof SKOSUntypedLiteral) {
+                SKOSUntypedLiteral unCon = con.getAnnotationValueAsConstant().getAsSKOSUntypedLiteral();
+                System.out.println("\t\tPrefLabel: " + unCon.getLiteral() + " lang: " + unCon.getLang());
+                prefLabel=unCon.getLiteral();
+            }
+            else if (con.getAnnotationValueAsConstant() instanceof SKOSTypedLiteral) {
+                SKOSTypedLiteral unCon = con.getAnnotationValueAsConstant().getAsSKOSTypedLiteral();
+                System.out.println("\t\tPrefLabel: " + unCon.getLiteral());
+                prefLabel=unCon.getLiteral();
+            }
     	}
-    	
-    	
+
     	ArrayList<String> result = new ArrayList<String>();
-    	for(SKOSAnnotation annotation : c.getSKOSAnnotations(dataSet))
-    	{
-    		if(annotation.getURI().getFragment().toString().compareTo("broader")==0)
+    	
+    	
+    	// Broader
+        for (SKOSEntity c : concept.getSKOSRelatedEntitiesByProperty(dataSet, df.getSKOSBroaderProperty())) {
+            System.out.println("\t\thasBroader: " + c.getURI());
+            for (SKOSLiteral BR :df.getSKOSConcept(c.getURI()).getSKOSRelatedConstantByProperty(dataSet, df.getSKOSPrefLabelProperty())) 
     		{
-    			ArrayList<String> aux = new ArrayList<String>();
-    			
-    			aux = getBroader(df.getSKOSConcept(URI.create(annotation.getAnnotationValue().getURI().toString())));
-    			
-    			for(int i = 0; i<aux.size(); i++)
+                System.out.println("Broader: " + BR.getLiteral());
+                ArrayList<String> aux = new ArrayList<String>();
+                aux = getBroader(df.getSKOSConcept(c.getURI()));
+                
+                for(int i = 0; i<aux.size(); i++)
     			{
     				String h = prefLabel+"/"+aux.get(i);
     				result.add(h);
     			}
-    		}
-    	}
-    	if(result.size()==0)
+            }
+
+        }
+        
+        if(result.size()==0)
     		result.add(prefLabel);
     	return result;
     }
