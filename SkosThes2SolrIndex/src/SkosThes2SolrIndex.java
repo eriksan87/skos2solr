@@ -26,7 +26,7 @@ public class SkosThes2SolrIndex {
     public SkosThes2SolrIndex()  {
     	
     	  SolrServer server = new HttpSolrServer("http://localhost:8983/solr/thesaurus");
-    	  	 
+    	  
     	  String MicTh="";
       
             SKOSManager man = null;
@@ -38,7 +38,7 @@ public class SkosThes2SolrIndex {
 			}
             df = man.getSKOSDataFactory();
             try {
-				dataSet = man.loadDataset(URI.create("file:/Users/Erik/Downloads/EuroVocSKOS.rdf"));
+				dataSet = man.loadDataset(URI.create("file:/Users/Windows/Desktop/docCorpus/thes/EuroVocSKOS.rdf"));
 			} catch (SKOSCreationException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
@@ -49,7 +49,7 @@ public class SkosThes2SolrIndex {
                 System.out.println("*********************************************************************");
                 SolrInputDocument doc = new SolrInputDocument();
                 
-//*********************************
+//*************************************************************************************************************************
             	
             	for (SKOSAnnotation anno : concepts.getSKOSAnnotations(dataSet)) {
             		String ID=null;
@@ -66,7 +66,7 @@ public class SkosThes2SolrIndex {
                 {
                 	ID=annotazione_corrente;
                 	System.out.println("ID="+ID);
-                	
+                	doc.addField("concept",ID);
                 	try {
 						Stemmer a=new Stemmer(ID);
 						doc.addField("descrittore",a.getIndexS());
@@ -80,9 +80,7 @@ public class SkosThes2SolrIndex {
 						// TODO Auto-generated catch block
 						e.printStackTrace();
 					}
-                	
-                	
-               
+                	       
                 }
             	
             	if(anno.getURI().getFragment().toString().compareTo("altLabel")==0) //se l'annotazione corrente è un' Altlabel allora lo metto nell'id
@@ -110,8 +108,30 @@ public class SkosThes2SolrIndex {
                 {
             		for (SKOSLiteral RL :df.getSKOSConcept(URI.create(annotazione_corrente)).getSKOSRelatedConstantByProperty(dataSet, df.getSKOSPrefLabelProperty())) 
             		{
-                        System.out.println(" Related: " + RL.getLiteral());
+                        System.out.println("Related: " + RL.getLiteral());
                         doc.addField("related", RL.getLiteral());
+                    }
+            		
+                }
+            	
+            	if(anno.getURI().getFragment().toString().compareTo("narrower")==0) //recupero i narrower
+                {
+            		for (SKOSLiteral NR :df.getSKOSConcept(URI.create(annotazione_corrente)).getSKOSRelatedConstantByProperty(dataSet, df.getSKOSPrefLabelProperty())) 
+            		{
+                        System.out.println("Narrower: " + NR.getLiteral());
+                        doc.addField("narrower", NR.getLiteral());
+                    }
+            		
+                }
+            	
+            	if(anno.getURI().getFragment().toString().compareTo("broader")==0) //recupero i broader
+                {
+            		for (SKOSLiteral BR :df.getSKOSConcept(URI.create(annotazione_corrente)).getSKOSRelatedConstantByProperty(dataSet, df.getSKOSPrefLabelProperty())) 
+            		{
+            			
+                        System.out.println("Broader: " + BR.getLiteral());
+                        doc.addField("broader", BR.getLiteral());
+                        
                     }
             		
                 }
@@ -142,7 +162,7 @@ public class SkosThes2SolrIndex {
             			
             		}
             		
-            		nuova= MicTh+"/"+nuova;
+            		//nuova= MicTh+"/"+nuova;
             		System.out.println("gerarchiaNuova: "+nuova);
             		doc.addField("hierarchy", nuova);
             		nuova="";
