@@ -1,0 +1,1 @@
+Da thesaurus file in formato skos all'indice di solr
